@@ -464,12 +464,12 @@ function pickList(a, prof, t) {
   let names = [];
   if (amb) names.push(amb.v.n);
   if (main.length) {
-    o += "ОСНОВНЫЕ ВАРИАНТЫ\n" + main.map(L).join("") + "\n";
+    o += "ОСНОВНЫЕ ВАРИАНТЫ\n\n" + main.map(L).join("\n") + "\n";
     main.forEach(function (x) { names.push(x.v.n); });
   } else {
     const goals = far.filter(function (x) { return x !== safe && x.st.gap < 900; }).sort(asc).slice(0, 2);
     if (goals.length) {
-      o += "ЦЕЛИ, КОГДА ПОДТЯНЕШЬ БАЛЛЫ\n" + goals.map(L).join("") + "\n";
+      o += "ЦЕЛИ, КОГДА ПОДТЯНЕШЬ БАЛЛЫ\n\n" + goals.map(L).join("\n") + "\n";
       goals.forEach(function (x) { names.push(x.v.n); });
     }
   }
@@ -566,11 +566,25 @@ function buildResult(a) {
   const t = computeTier(a);
   const prof = (a.prof && a.prof !== "unknown") ? a.prof : "it";
   const paidWord = (a.pay === "paid" || a.pay === "budget_first");
-  let out = "";
-  out += "Уровень готовности: Tier " + t.tier + " (" + t.pct + "% от максимума). Мини-тест: верно " + t.correct + " из 5, набрано " + t.points + " из 15 баллов сложности" + (t.hardest ? ", самый сложный решённый вопрос №" + t.hardest : ", ни один вопрос не решён") + " (вопросы идут от простого к сложному, вес вопроса равен его номеру).\n";
-  if (t.capped) out += "Баллы тянули на Tier A, но подтверждённого результата нет (пробник 85+ или сильная олимпиада), поэтому уровень снижен до B: у МФТИ минимум 85 по профильным, у МГУ высокие минимумы и ДВИ. Подтверди результат пробником, и Tier A откроется.\n";
-  out += "\n";
   const pl = pickList(a, prof, t);
+  let out = "";
+
+  // ---- КОРОТКАЯ СВОДКА: абзац 1 (где ты сейчас), абзац 2 (список), абзац 3 (план ниже) ----
+  const moMsk = monthsToEge(a);
+  let p1 = "Сейчас у тебя уровень Tier " + t.tier + " (" + t.pct + "% от максимума, мини-тест верно " + t.correct + " из 5), до ЕГЭ около " + moMsk + " мес.";
+  if (t.capped) p1 += " Баллы тянут на Tier A, но без подтверждения пробником от 85 или сильной олимпиады держу тебя на Tier B — это осторожная оценка, подтвердишь результат, и уровень вырастет.";
+  if (a.army === "avoid") p1 += " Отсрочки ждать негде, поэтому подавать документы нужно сразу после школы, пауза в год не вариант.";
+  out += p1 + "\n\n";
+
+  let shortNames = [];
+  if (pl.dream) shortNames.push(pl.dream.dv.n + " (мечта)");
+  pl.names.forEach(function (n) { if (!pl.dream || n !== pl.dream.dv.n) shortNames.push(n); });
+  out += "Твой список для подачи: " + shortNames.join(", ") + ". По каждому вузу ниже есть проходной балл, цена (если платно) и короткий комментарий.\n\n";
+
+  out += "Дальше в этом же порядке: подробный список вузов, на что обратить внимание и план действий по шагам — не торопись, там всё по пунктам.\n\n";
+  out += "==========\n\n";
+  // ---- /КОРОТКАЯ СВОДКА ----
+
   out += pl.text;
 
   // Что учтено при отборе
@@ -689,7 +703,7 @@ function buildResult(a) {
   if (a.fb === "lower") plan.push("Запасной путь — менее конкурентное направление: выбери его сейчас и добавь в список подачи, а не после результатов.");
   if (a.career === "startup") plan.push("Тебе важнее практика, чем диплом: ищи вузы с акселераторами и проектными курсами (в моей базе таких данных нет, проверь на сайтах).");
   plan.push("Проверь актуальные проходные баллы и даты подачи на сайтах вузов: цифры выше взяты на 02.10.2026.");
-  out += "ПЛАН ДЕЙСТВИЙ\n" + plan.map(function (x, i) { return (i + 1) + ". " + x; }).join("\n") + "\n\n";
+  out += "ПЛАН ДЕЙСТВИЙ\n\n" + plan.map(function (x, i) { return (i + 1) + ". " + x; }).join("\n\n") + "\n\n";
 
   out += "(Данные собраны 02.10.2026 по сайтам вузов и каталогам. Проходные баллы в основном за 2025 год (для МЭИ и физики РУДН есть и данные 2026), на твоё поступление они изменятся. Неполные данные: МГУ, Финансовый университет, ПМИ в РУДН. Перед подачей проверь всё на сайтах вузов.)";
   return out;
@@ -1016,6 +1030,41 @@ function buildForeignResult(a) {
   const PN = { phys: "физика и инженерия", it: "информатика и IT", math: "математика", unknown: "направление пока не выбрано" };
   const unlimited = (a.fpay === "unlimited");
   let o = "";
+
+  // ---- КОРОТКАЯ СВОДКА: абзац 1 (где ты сейчас), абзац 2 (список), абзац 3 (план ниже) ----
+  const moF = monthsToEge(a);
+  const capF = unlimited ? null : (a.bmode === "total" ? CAP_TOTAL[a.bamt] : CAP_YEAR[a.bamt]);
+  let p1 = "Страна: " + c.name + ", направление: " + PN[a.prof || "unknown"] + ". До ЕГЭ или выпуска около " + moF + " мес.";
+  if (a.army === "avoid") p1 += " Отсрочки ждать негде, поэтому готовь документы так, чтобы поступить сразу после школы.";
+  o += p1 + "\n\n";
+
+  let known2 = 0, okCount2 = 0;
+  const cheapestFirst = c.tiers.slice().sort(function (x, y) {
+    const rx = foreignCost(c, x, life, a), ry = foreignCost(c, y, life, a);
+    if (!rx && !ry) return 0; if (!rx) return 1; if (!ry) return -1;
+    return rx.lo - ry.lo;
+  });
+  let okNames2 = [];
+  cheapestFirst.forEach(function (t) {
+    const r = foreignCost(c, t, life, a);
+    if (!r) return; known2++;
+    if (!capF || capF >= 1e11) { okNames2.push(t.n); return; }
+    const val = a.bmode === "total" ? r.lo : r.lo / r.n;
+    const valHi = a.bmode === "total" ? r.hi : r.hi / r.n;
+    if (val <= capF) { okCount2++; okNames2.push(t.n); }
+  });
+  if (!known2) {
+    o += "По этой стране точных цен в моей базе мало — смотри подробности ниже и обязательно проверяй цены на сайтах вузов.\n\n";
+  } else if (capF && capF < 1e11 && !okCount2) {
+    o += "Бюджета не хватает ни на один из вариантов с известной ценой (из них: " + cheapestFirst.filter(function(t){return foreignCost(c,t,life,a);}).map(function(t){return t.n;}).join(", ") + "). Нужно менять бюджет, уровень жизни или страну — подробности и цифры ниже.\n\n";
+  } else {
+    o += "По деньгам подходят: " + okNames2.join(", ") + ". Полный разбор цен, языка и документов — в следующих разделах.\n\n";
+  }
+
+  o += "Дальше по порядку: что нужно для поступления, язык, полный расчёт денег, на что обратить внимание и план действий по шагам.\n\n";
+  o += "==========\n\n";
+  // ---- /КОРОТКАЯ СВОДКА ----
+
   o += "ЗА ГРАНИЦЕЙ: " + c.name.toUpperCase() + "\n";
   o += "Направление: " + PN[a.prof || "unknown"] + ".\n\n";
 
@@ -1091,9 +1140,8 @@ function buildForeignResult(a) {
       }
     }
     if (t.note) line += "; " + t.note;
-    o += line + "\n";
+    o += line + "\n\n";
   });
-  o += "\n";
   if (cap && cap < 1e11 && known && !okCount) {
     o += "ВНИМАНИЕ: твоего бюджета не хватает ни на один вариант с известной ценой в этой стране. Можно вернуться и выбрать другую страну или другой уровень жизни, либо увеличить бюджет.\n\n";
   }
@@ -1148,7 +1196,7 @@ function buildForeignResult(a) {
   if (a.fc === "ae") plan.push("Составь список вузов под свой бюджет (федеральные дешевле филиалов западных вузов) и проверь, нужен ли Foundation Year при твоём английском.");
   foreignTimingLines(a).forEach(function (x) { plan.push(x); });
   plan.push("Перед подачей сверь все цены, пороги и дедлайны на сайтах вузов: цифры выше собраны 03.10.2026.");
-  o += "ПЛАН ДЕЙСТВИЙ\n" + plan.map(function (x, i) { return (i + 1) + ". " + x; }).join("\n") + "\n\n";
+  o += "ПЛАН ДЕЙСТВИЙ\n\n" + plan.map(function (x, i) { return (i + 1) + ". " + x; }).join("\n\n") + "\n\n";
 
   o += "(Суммы собраны на 03.10.2026 из сайтов вузов, посольств и сводок; «от» значит нижняя граница, реальные цифры выше. В расчёт не вошли: " + c.miss + ". Расходы на жизнь взяты по шкале выбранной страны, но внутри страны город сильно влияет: Лондон, Нью-Йорк, Милан, Амстердам и Мюнхен дороже среднего по стране, небольшие города дешевле.)\n";
   return o;
