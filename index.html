@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Выбор вуза — v16</title>
+<title>Выбор вуза — v17</title>
 <style>
 body { font-family: Arial, sans-serif; max-width: 640px; margin: 30px auto; padding: 0 16px; }
 .option { display: block; margin: 12px 0; font-size: 18px; cursor: pointer; }
@@ -19,7 +19,7 @@ button { font-size: 16px; padding: 8px 20px; margin: 18px 10px 0 0; cursor: poin
 <body>
 
 <button id="feedbackBtn" onclick="openGeneralFeedback()">Есть вопрос / предложение?</button>
-<div style="color:#999;font-size:12px;margin-bottom:6px">версия v16</div>
+<div style="color:#666;font-size:13px;margin-bottom:6px">версия v17</div>
 
 <div id="progress"></div>
 <div id="question"></div>
@@ -701,7 +701,28 @@ const FX_DATE = "03.10.2026";
 const FX = { USD: 83.4839, EUR: 94.3201, GBP: 110.2989, CNY: 12.43, AED: 22.7322 }; // USD, EUR, GBP, AED: ЦБ РФ на 03.10.2026; CNY: 12,43 по ленте курсов новостного сайта на 03.10.2026 (самого курса ЦБ на эту дату не открывал)
 
 // Жильё и еда в месяц, USD (общая шкала, без поправки на дороговизну города)
-const LIFE = { "1": 800, "2": 1500, "3": 3000, "4": 4000 };
+const LIFE = { "1": 800, "2": 1500, "3": 3000, "4": 4000 }; // запасная общая шкала, если страна не выбрана
+// Жильё и еда в месяц, USD, отдельно по странам: 1 скромный, 2 средний, 3 комфортный, 4 роскошный.
+// Основа: университетские и справочные оценки 2026 года; Дубай и США считаются дороже, Китай дешевле. Это оценки автора, не точные цены.
+const LIFE_C = {
+  de: { "1": 1100, "2": 1400, "3": 1800, "4": 3000 },
+  uk: { "1": 1200, "2": 1800, "3": 2800, "4": 4200 },
+  it: { "1": 950,  "2": 1300, "3": 1900, "4": 3000 },
+  nl: { "1": 1300, "2": 1700, "3": 2500, "4": 3800 },
+  us: { "1": 1300, "2": 2000, "3": 3200, "4": 5000 },
+  cn: { "1": 350,  "2": 650,  "3": 1200, "4": 2200 },
+  ae: { "1": 1500, "2": 2500, "3": 4500, "4": 10000 }
+};
+function lifeUSD(fc, life) { return (LIFE_C[fc] && LIFE_C[fc][life]) || LIFE[life]; }
+function lifeRubK(fc, life) { return Math.round(lifeUSD(fc, life) * FX.USD / 1000); }
+function lifeLabel(fc, life) {
+  const d = { "1": "Скромный: общежитие или комната с соседями, готовлю дома",
+              "2": "Средний: своя комната, иногда кафе",
+              "3": "Комфортный: отдельная студия, часто кафе",
+              "4": "Роскошный: дорогое жильё и развлечения" };
+  const u = String(lifeUSD(fc, life)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return d[life] + ", около " + u + " $ (≈ " + lifeRubK(fc, life) + " тыс. ₽) в месяц";
+}
 const LIFE_NAME = { "1": "скромный", "2": "средний", "3": "комфортный", "4": "роскошный" };
 const CAP_YEAR = { "1": 500000, "2": 1500000, "3": 3000000, "4": 6000000, "5": 1e12 };
 const CAP_TOTAL = { "1": 1500000, "2": 4000000, "3": 8000000, "4": 16000000, "5": 1e12 };
@@ -968,7 +989,7 @@ function foreignCost(c, t, life, a) {
   const n = c.years + c.prep;
   let mLive = 0;
   if (!t.allIn) {
-    mLive = LIFE[life] * FX.USD;
+    mLive = lifeUSD(a && a.fc, life) * FX.USD;
     if (c.floorEurMonth) mLive = Math.max(mLive, c.floorEurMonth * FX.EUR);
   }
   const ins = c.insurance ? c.insurance.amt * FX[c.insurance.cur] : 0;
@@ -1042,7 +1063,7 @@ function buildForeignResult(a) {
   const y0 = yearsToEntry(a);
   const growth = Math.pow(PRICE_GROWTH, y0);
   o += "ДЕНЬГИ: ПОЛНАЯ СТОИМОСТЬ ПУТИ\n";
-  o += "Путь: " + c.years + " г. бакалавриата" + (c.prep ? " + " + c.prep + " г. подготовительного года" : "") + ". В расчёт входят: обучение за все годы, подготовительный год, жильё и еда по твоему уровню («" + LIFE_NAME[life] + "», " + LIFE[life] + " $ в месяц), два перелёта туда-обратно в год (" + String(Math.round(c.flightRub[0] / 1000)) + "–" + String(Math.round(c.flightRub[1] / 1000)) + " тыс. ₽ за билет, по ценам сайтов продажи), медицинская страховка, визовые сборы, английский экзамен за границей (с дорогой) и подача документов." + (c.visaTrip ? " Для США добавлена поездка за визой в третью страну." : "") + "\n";
+  o += "Путь: " + c.years + " г. бакалавриата" + (c.prep ? " + " + c.prep + " г. подготовительного года" : "") + ". В расчёт входят: обучение за все годы, подготовительный год, жильё и еда по твоему уровню («" + LIFE_NAME[life] + "», " + lifeUSD(a.fc, life) + " $ в месяц, шкала для этой страны), два перелёта туда-обратно в год (" + String(Math.round(c.flightRub[0] / 1000)) + "–" + String(Math.round(c.flightRub[1] / 1000)) + " тыс. ₽ за билет, по ценам сайтов продажи), медицинская страховка, визовые сборы, английский экзамен за границей (с дорогой) и подача документов." + (c.visaTrip ? " Для США добавлена поездка за визой в третью страну." : "") + "\n";
   if (c.floorEurMonth) o += "Расходы на жизнь взяты не ниже суммы, которую нужно подтвердить для визы (" + String(c.floorEurMonth).replace(".", ",") + " € в месяц).\n";
   o += "Что в расчёте взято из источников, а что оценено мной: обучение, виза, подготовительный год и страховка Германии и Китая взяты с сайтов вузов и сводок; перелёты — диапазон по ценам сайтов (для Европы и Великобритании источники старые или косвенные); страховка в других странах, подача документов и экзамен — мои оценки; рост цен 5% в год — моё допущение.\n";
   o += "Как читать суммы: «от» — нижняя граница по сегодняшним ценам, реально выйдет выше. Рядом дана оценка к твоему поступлению: цены растут, а до поступления примерно " + y0.toFixed(1).replace(".", ",") + " года (множитель около " + growth.toFixed(2).replace(".", ",") + "). Закладывай ещё запас 10–15% на непредвиденное.\n";
@@ -1129,7 +1150,7 @@ function buildForeignResult(a) {
   plan.push("Перед подачей сверь все цены, пороги и дедлайны на сайтах вузов: цифры выше собраны 03.10.2026.");
   o += "ПЛАН ДЕЙСТВИЙ\n" + plan.map(function (x, i) { return (i + 1) + ". " + x; }).join("\n") + "\n\n";
 
-  o += "(Суммы собраны на 03.10.2026 из сайтов вузов, посольств и сводок; «от» значит нижняя граница, реальные цифры выше. В расчёт не вошли: " + c.miss + ". Шкала расходов на жизнь общая и не учитывает, что в Лондоне, Нью-Йорке, Милане или Амстердаме то же самое стоит заметно дороже.)\n";
+  o += "(Суммы собраны на 03.10.2026 из сайтов вузов, посольств и сводок; «от» значит нижняя граница, реальные цифры выше. В расчёт не вошли: " + c.miss + ". Расходы на жизнь взяты по шкале выбранной страны, но внутри страны город сильно влияет: Лондон, Нью-Йорк, Милан, Амстердам и Мюнхен дороже среднего по стране, небольшие города дешевле.)\n";
   return o;
 }
 // ===== /ЗАРУБЕЖНАЯ ВЕТКА =====
@@ -1180,7 +1201,11 @@ let answers = {};        // prefix -> value
 function render() {
   const q = TREE[current];
   document.getElementById("progress").textContent = "Шаг " + (history.length + 1);
-  document.getElementById("question").textContent = q.text;
+  let qtext = q.text;
+  if (current === "FB3" && answers.fc && LIFE_C[answers.fc]) {
+    qtext = "Какой уровень жизни тебе нужен? Суммы для этой страны, жильё и еда в месяц.";
+  }
+  document.getElementById("question").textContent = qtext;
   const box = document.getElementById("options");
   box.innerHTML = "";
   const prevTag = (history.length && history[history.length - 1].id === current) ? null : null;
@@ -1192,7 +1217,9 @@ function render() {
     const p = tagParts(opt[1]);
     if (answers[p[0]] === p[1] && savedFor[current] === opt[1]) input.checked = true;
     label.appendChild(input);
-    label.appendChild(document.createTextNode(opt[0]));
+    let optText = opt[0];
+    if (current === "FB3" && answers.fc && LIFE_C[answers.fc]) { optText = lifeLabel(answers.fc, p[1]); }
+    label.appendChild(document.createTextNode(optText));
     box.appendChild(label);
   });
   document.getElementById("backBtn").style.display = history.length ? "inline-block" : "none";
